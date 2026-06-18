@@ -20,10 +20,34 @@ rescue
 end
 
 FileUtils.mkdir_p openbabel_dir
+# Ref to clone from upstream OpenBabel. Defaults to the release tag derived from
+# OpenBabel::VERSION (e.g. '3.1.1' -> 'openbabel-3-1-1'); override with the OPENBABEL env var.
+version = ENV.fetch('OPENBABEL', 'openbabel-' + OpenBabel::VERSION.gsub(/\./,"-"))
 Dir.chdir main_dir do
   FileUtils.rm_rf src_dir
-  puts "Downloading OpenBabel sources"
-  system "git clone https://github.com/ComPlat/openbabel.git #{src_dir}"
+  puts "Downloading OpenBabel sources (#{version})"
+  unless system "git clone --depth 1 https://github.com/openbabel/openbabel.git --branch #{version} #{src_dir}"
+    abort "Failed to clone OpenBabel #{version} — aborting build"
+  end
+end
+
+# Patch: the openbabel-3-1-1 release tag predates upstream PR #2533 and is missing
+# `#include <ctime>` in obutil.h, so it fails to compile on GCC 11+ (clock / CLOCKS_PER_SEC
+# not declared). Inject the include idempotently right after the header guard so the gem
+# builds on a modern toolchain. Newer refs already carry the include and are left untouched.
+obutil_h = File.join(src_dir, "include", "openbabel", "obutil.h")
+if File.exist?(obutil_h)
+  contents = File.read(obutil_h)
+  unless contents.include?("#include <ctime>")
+    patched = contents.sub(/(#define\s+OB_UTIL_H\b.*\n)/, "\\1#include <ctime>\n")
+    if patched == contents
+      abort "Failed to apply <ctime> patch to #{obutil_h} (header guard not found)"
+    end
+    File.write(obutil_h, patched)
+    puts "Patched #{obutil_h}: added #include <ctime>"
+  end
+else
+  abort "Expected #{obutil_h} after clone, but it is missing — aborting build"
 end
 
 FileUtils.mkdir_p build_dir
