@@ -16,12 +16,13 @@ RUN gem install rake test-unit
 WORKDIR /gem
 COPY . .
 
-# Run the native extension build directly via extconf.rb (this is what `gem install`
-# would invoke). It git-clones OpenBabel at the version-derived tag, cmake/make-builds
-# it with SWIG Ruby bindings, and installs into the gem's local ./openbabel tree.
-# -Ilib + requiring openbabel/version supplies the OpenBabel::VERSION constant that
-# extconf.rb references but does not require itself.
-RUN cd ext/openbabel && ruby -I../../lib -ropenbabel/version extconf.rb
+# Run the native extension build via a bare `ruby extconf.rb` — exactly how RubyGems/Bundler
+# invoke it (no -Ilib, no pre-required version). extconf.rb loads OpenBabel::VERSION itself.
+# Do NOT add -ropenbabel/version here: pre-loading it would mask a real install-time failure
+# (extconf referencing the constant without requiring it), which is how that bug once escaped.
+# It git-clones OpenBabel at the version-derived tag, cmake/make-builds it with SWIG Ruby
+# bindings, and installs into the gem's local ./openbabel tree.
+RUN cd ext/openbabel && ruby extconf.rb
 
 # Verify the compiled bindings load and behave (loads ./lib/openbabel.rb).
 CMD ["ruby", "-Ilib", "-e", "require 'openbabel'; include OpenBabel; c=OBConversion.new; c.set_in_format('smi'); m=OBMol.new; c.read_string(m,'CC(C)CCCC(C)C1CCC2C1(CCC3C2CC=C4C3(CCC(C4)O)C)C'); m.add_hydrogens; raise 'formula '+m.get_formula unless m.get_formula=='C27H46O'; raise 'atoms '+m.num_atoms.to_s unless m.num_atoms==74; puts 'OK formula='+m.get_formula+' atoms='+m.num_atoms.to_s"]

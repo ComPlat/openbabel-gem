@@ -4,6 +4,11 @@ require 'mkmf'
 
 main_dir = File.expand_path(File.join(File.dirname(__FILE__),"..",".."))
 
+# Supplies OpenBabel::VERSION (used below to derive the OpenBabel git tag). RubyGems/Bundler
+# run this extconf via a bare `ruby extconf.rb` without the gem's lib/ on the load path, so we
+# must load the version file ourselves rather than relying on the caller to pre-require it.
+require File.join(main_dir, 'lib', 'openbabel', 'version')
+
 # install OpenBabel
 
 openbabel_dir = File.join main_dir, "openbabel_src"
