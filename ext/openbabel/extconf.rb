@@ -36,10 +36,12 @@ Dir.chdir main_dir do
   end
 end
 
-# Patch: the openbabel-3-1-1 release tag predates upstream PR #2533 and is missing
-# `#include <ctime>` in obutil.h, so it fails to compile on GCC 11+ (clock / CLOCKS_PER_SEC
-# not declared). Inject the include idempotently right after the header guard so the gem
-# builds on a modern toolchain. Newer refs already carry the include and are left untouched.
+# Patch: release tags up to and including openbabel-3-1-1 predate upstream PR #2533 and are
+# missing `#include <ctime>` in obutil.h, so they fail to compile on GCC 11+ (clock /
+# CLOCKS_PER_SEC not declared). Inject the include idempotently right after the header guard
+# so those refs build on a modern toolchain. The default ref (openbabel-3-2-0) and any newer
+# ref already carry the include, so this is a no-op for them — it only matters when building
+# an older ref via the OPENBABEL override.
 obutil_h = File.join(src_dir, "include", "openbabel", "obutil.h")
 if File.exist?(obutil_h)
   contents = File.read(obutil_h)
